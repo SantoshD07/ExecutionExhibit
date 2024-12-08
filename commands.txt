@@ -1,0 +1,5 @@
+#Container
+podman run -d -p 7900:7900 --env VNC_NO_PASSWORD=true selenium/standalone-chrome
+
+#URL
+http://localhost:7900/vnc.html?autoconnect=true
