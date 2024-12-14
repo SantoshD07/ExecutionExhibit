@@ -1,37 +1,45 @@
+from __future__ import annotations
+
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Annotated, Union
 
+from sqlalchemy import create_engine, text, select
+from sqlalchemy.orm import sessionmaker, declarative_base
 
-class TEST_value(BaseModel):
-    name: str
-
-
-class TEST(BaseModel):
-    basket: List[TEST_value]
-
+from data_models.agent_heartbeat_view import AgentHeartbeatView, AgentHeartbeatViewResponse
 
 app = FastAPI()
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173"
+]
 
-origins = ["http://localhost:3000"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"],
-                   allow_headers=["*"])
+DATABASE_URL = "postgresql://postgres:storage@localhost:5432/postgres"
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-memory_db = {'basket': []}
 
-@app.get("/test", response_model=TEST)
-def get_test():
-    print(memory_db["basket"])
+@app.get("/get_active_workers", response_model=List[AgentHeartbeatViewResponse])
+async def get_active_workers():
+    db = SessionLocal()
+    query = select(AgentHeartbeatView)
+    result = db.execute(query).scalars().all()
+    print(result)
+    return result
 
-@app.post("/test", response_model=TEST_value)
-def add_test(var: TEST_value):
-    memory_db["basket"].append(var)
-    print(memory_db)
-    return var
+
 
 if __name__ == '__main__':
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-
+    uvicorn.run(app, host="127.0.0.1", port=8000)
