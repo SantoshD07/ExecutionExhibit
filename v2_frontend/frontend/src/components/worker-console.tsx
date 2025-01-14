@@ -1,5 +1,3 @@
-// File: components/worker-console.tsx
-import { formatDistanceToNow } from 'date-fns'
 import { useEffect, useRef, useState } from 'react'
 import { ExternalLink, Terminal } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,8 +8,8 @@ interface WorkerConsoleProps {
     iteration_id: string
     execution_id: string
     script: string
+    vncPort?: number
   }
-  // Index to calculate VNC port
   index: number
 }
 
@@ -20,9 +18,8 @@ export default function WorkerConsole({ worker, index }: WorkerConsoleProps) {
   const [shouldLoad, setShouldLoad] = useState(false)
   const [hasError, setHasError] = useState(false)
 
-  // Calculate VNC port based on worker index (e.g., 7900 + index)
-  const vncPort = 7900
-  const hasVnc = true // Always true as we're assigning ports
+  const vncPort = worker.vncPort
+  const hasVnc = Boolean(worker.vncPort)
   const vncUrl = `http://localhost:${vncPort}/vnc.html?autoconnect=true`
   const wsUrl = `ws://localhost:${vncPort}`
 
@@ -36,9 +33,7 @@ export default function WorkerConsole({ worker, index }: WorkerConsoleProps) {
           observer.disconnect()
         }
       },
-      {
-        rootMargin: '50px'
-      }
+      { rootMargin: '50px' }
     )
 
     if (iframeRef.current) {
@@ -52,53 +47,48 @@ export default function WorkerConsole({ worker, index }: WorkerConsoleProps) {
     window.open(vncUrl, '_blank')
   }
 
-  // Function to test VNC WebSocket connection
   const checkVncConnection = () => {
-    if (!wsUrl) return;
+    if (!wsUrl) return
 
-    let timeoutId: NodeJS.Timeout;
-    const ws = new WebSocket(wsUrl);
+    let timeoutId: NodeJS.Timeout
+    const ws = new WebSocket(wsUrl)
 
     const cleanup = () => {
-      clearTimeout(timeoutId);
-      ws.close();
-    };
+      clearTimeout(timeoutId)
+      ws.close()
+    }
 
     timeoutId = setTimeout(() => {
-      setHasError(true);
-      cleanup();
-    }, 2000);
+      setHasError(true)
+      cleanup()
+    }, 2000)
 
     ws.onopen = () => {
-      cleanup();
-    };
+      cleanup()
+    }
 
     ws.onerror = () => {
-      setHasError(true);
-      cleanup();
-    };
-  };
-
-  const handleIframeError = () => {
-    setHasError(true);
-  };
+      setHasError(true)
+      cleanup()
+    }
+  }
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data === 'vnc_failed' || event.data === 'vnc_disconnected') {
-        setHasError(true);
+        setHasError(true)
       }
-    };
+    }
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
+    window.addEventListener('message', handleMessage)
+    return () => window.removeEventListener('message', handleMessage)
+  }, [])
 
   useEffect(() => {
     if (shouldLoad && hasVnc) {
-      checkVncConnection();
+      checkVncConnection()
     }
-  }, [shouldLoad, hasVnc, wsUrl]);
+  }, [shouldLoad, hasVnc, wsUrl])
 
   return (
     <Card className="border-slate-700 bg-slate-800/50 hover:bg-slate-800 transition-colors">
@@ -106,6 +96,7 @@ export default function WorkerConsole({ worker, index }: WorkerConsoleProps) {
         <CardTitle className="text-sm font-medium text-white flex items-center gap-2">
           <Terminal className="h-4 w-4 text-slate-300" />
           {worker.execution_id}-{index + 1}
+          {hasVnc && <span className="text-xs text-slate-400">Port: {vncPort}</span>}
         </CardTitle>
         {hasVnc && !hasError && (
           <Button
@@ -131,28 +122,29 @@ export default function WorkerConsole({ worker, index }: WorkerConsoleProps) {
             <span className="text-slate-100">Running</span>
           </div>
         </div>
+
         {!hasError ? (
-          <div className="relative bg-slate-950 rounded-lg overflow-hidden h-[180px] border border-slate-700/50">
-            <iframe
-              ref={iframeRef}
-              src={shouldLoad ? vncUrl : ''}
-              className="absolute inset-0 w-full h-full"
-              title={`VNC for ${worker.execution_id}-${index + 1}`}
-              loading="lazy"
-              allowFullScreen
-              onError={handleIframeError}
-            />
-            {!shouldLoad && (
-              <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs">
-                Loading VNC viewer...
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-[180px] bg-slate-900/50 rounded-lg border border-slate-700/50 text-slate-500 text-xs">
-            VNC connection failed
-          </div>
-        )}
+            <div className="relative bg-slate-950 rounded-lg overflow-hidden h-[180px] border border-slate-700/50">
+              <iframe
+                ref={iframeRef}
+                src={shouldLoad ? vncUrl : ''}
+                className="absolute inset-0 w-full h-full"
+                title={`VNC for ${worker.execution_id}-${index + 1}`}
+                loading="lazy"
+                allowFullScreen
+                onError={() => setHasError(true)}
+              />
+              {!shouldLoad && (
+                <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-xs">
+                  Loading VNC viewer...
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-[180px] bg-slate-900/50 rounded-lg border border-slate-700/50 text-slate-500 text-xs">
+              No VNC connection
+            </div>
+          )}
       </CardContent>
     </Card>
   )
